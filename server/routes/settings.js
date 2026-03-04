@@ -1,0 +1,83 @@
+const router = require('express').Router();
+const db = require('../db');
+const { testConnection } = require('../services/hubspotClient');
+const config = require('../config');
+
+const MASK = '•';
+
+function getSetting(key) {
+  const row = db.prepare('SELECT value FROM settings WHERE key=?').get(key);
+  return row ? row.value : null;
+}
+
+function setSetting(key, value) {
+  db.prepare(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value'
+  ).run(key, value);
+}
+
+function maskToken(token) {
+  if (!token || token.length <= 8) return token;
+  return MASK.repeat(token.length - 4) + token.slice(-4);
+}
+
+// Bootstrap from env on startup (only if DB has no value)
+(function bootstrap() {
+  if (config.hubspotApiToken && !getSetting('hubspot_api_token')) {
+    setSetting('hubspot_api_token', config.hubspotApiToken.trim());
+  }
+})();
+
+router.get('/', (req, res) => {
+  const token = getSetting('hubspot_api_token');
+  res.json({
+    has_token: !!token,
+    hubspot_api_token: token ? maskToken(token) : '',
+    size_property: getSetting('size_property') || '',
+    network_property: getSetting('network_property') || '',
+    implementing_stage_ids: getSetting('implementing_stage_ids') || '[]',
+    launched_stage_ids: getSetting('launched_stage_ids') || '[]',
+    contract_start_property: getSetting('contract_start_property') || '',
+    contract_end_property: getSetting('contract_end_property') || '',
+    contract_renewal_property: getSetting('contract_renewal_property') || '',
+    launch_date_property: getSetting('launch_date_property') || '',
+  });
+});
+
+router.put('/', (req, res) => {
+  const { hubspot_api_token, size_property, network_property, implementing_stage_ids, launched_stage_ids, contract_start_property, contract_end_property, contract_renewal_property, launch_date_property } = req.body;
+
+  // Only save token if it's not the masked version
+  if (hubspot_api_token !== undefined && !hubspot_api_token.includes(MASK)) {
+    setSetting('hubspot_api_token', hubspot_api_token.trim());
+  }
+  if (size_property !== undefined) setSetting('size_property', size_property);
+  if (network_property !== undefined) setSetting('network_property', network_property);
+  if (implementing_stage_ids !== undefined)
+    setSetting('implementing_stage_ids', JSON.stringify(implementing_stage_ids));
+  if (launched_stage_ids !== undefined)
+    setSetting('launched_stage_ids', JSON.stringify(launched_stage_ids));
+  if (contract_start_property !== undefined) setSetting('contract_start_property', contract_start_property);
+  if (contract_end_property !== undefined) setSetting('contract_end_property', contract_end_property);
+  if (contract_renewal_property !== undefined) setSetting('contract_renewal_property', contract_renewal_property);
+  if (launch_date_property !== undefined) setSetting('launch_date_property', launch_date_property);
+
+  res.json({ ok: true });
+});
+
+router.post('/test', async (req, res) => {
+  const token = req.body.token || getSetting('hubspot_api_token');
+  if (!token) return res.status(400).json({ error: 'No API token configured' });
+  try {
+    await testConnection(token);
+    res.json({ ok: true });
+  } catch (err) {
+    const status = err.response?.status || 500;
+    const hubspotData = err.response?.data;
+    const message = hubspotData?.message || err.message;
+    console.error('HubSpot test connection failed:', status, hubspotData || err.message);
+    res.status(status).json({ error: message, hubspot: hubspotData });
+  }
+});
+
+module.exports = router;
