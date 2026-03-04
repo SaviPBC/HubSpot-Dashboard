@@ -21,7 +21,7 @@ router.get('/', (req, res) => {
     const placeholders = implementingIds.map(() => '?').join(',');
     implementing = db
       .prepare(
-        `SELECT id, name, pipeline, stage_id, size_value, network_value, created_at
+        `SELECT id, name, pipeline, stage_id, size_value, network_value, created_at, launched_at
          FROM deals WHERE stage_id IN (${placeholders})
          ORDER BY created_at DESC`
       )

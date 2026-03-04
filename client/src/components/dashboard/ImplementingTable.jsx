@@ -1,5 +1,10 @@
 import { useState } from 'react';
 
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 function daysSince(iso) {
   if (!iso) return null;
   const ms = Date.now() - new Date(iso).getTime();
@@ -44,7 +49,7 @@ export default function ImplementingTable({ deals }) {
           <table style={tableStyle}>
             <thead>
               <tr>
-                {[['name', 'Name'], ['size_value', 'Size'], ['network_value', 'Network (Employers)'], ['stage_id', 'Stage ID'], ['days', 'Days Active']].map(
+                {[['name', 'Name'], ['size_value', 'Size'], ['network_value', 'Network (Employers)'], ['launched_at', 'Launch Date'], ['stage_id', 'Stage ID'], ['days', 'Days Active']].map(
                   ([col, label]) => (
                     <th key={col} style={thStyle} onClick={() => sort(col)}>
                       {label}{arrow(col)}
@@ -59,6 +64,7 @@ export default function ImplementingTable({ deals }) {
                   <td style={tdStyle}>{deal.name}</td>
                   <td style={tdStyle}>{deal.size_value || '—'}</td>
                   <td style={tdStyle}>{deal.network_value || '—'}</td>
+                  <td style={tdStyle}>{fmtDate(deal.launched_at)}</td>
                   <td style={tdStyle}>{deal.stage_id || '—'}</td>
                   <td style={tdStyle}>{daysSince(deal.created_at) ?? '—'}</td>
                 </tr>
