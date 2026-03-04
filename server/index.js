@@ -12,6 +12,7 @@ app.use('/api/hubspot', require('./routes/hubspot'));
 app.use('/api/sync', require('./routes/sync'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/renewals', require('./routes/renewals'));
+app.use('/api/snapshots', require('./routes/snapshots'));
 
 app.use(errorHandler);
 

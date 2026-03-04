@@ -95,6 +95,53 @@ async function fetchAllDeals(token, properties) {
   return deals;
 }
 
+async function searchDealsSince(token, properties, sinceMs) {
+  const client = buildClient(token);
+  const deals = [];
+  let after = undefined;
+
+  while (true) {
+    const body = {
+      filterGroups: [
+        {
+          filters: [
+            {
+              propertyName: 'hs_lastmodifieddate',
+              operator: 'GTE',
+              value: String(sinceMs),
+            },
+          ],
+        },
+      ],
+      properties,
+      limit: 100,
+    };
+    if (after) body.after = after;
+
+    const res = await requestWithRetry(client, {
+      method: 'POST',
+      url: '/crm/v3/objects/deals/search',
+      data: body,
+    });
+
+    const { total, results, paging } = res.data;
+    deals.push(...results);
+
+    // Search API caps at 10,000 results — signal caller to fall back to full sync
+    if (total > 10000) {
+      return { deals, capped: true, total };
+    }
+
+    if (paging && paging.next && paging.next.after) {
+      after = paging.next.after;
+    } else {
+      break;
+    }
+  }
+
+  return { deals, capped: false, total: deals.length };
+}
+
 async function testConnection(token) {
   const client = buildClient(token);
   await requestWithRetry(client, {
@@ -104,4 +151,4 @@ async function testConnection(token) {
   });
 }
 
-module.exports = { getProperties, getPipelines, fetchAllDeals, testConnection };
+module.exports = { getProperties, getPipelines, fetchAllDeals, searchDealsSince, testConnection };

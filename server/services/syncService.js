@@ -1,5 +1,6 @@
 const db = require('../db');
-const { fetchAllDeals } = require('./hubspotClient');
+const { fetchAllDeals, searchDealsSince } = require('./hubspotClient');
+const { saveSnapshot } = require('./snapshotService');
 
 let currentSync = {
   status: 'idle',
@@ -19,7 +20,14 @@ function getStatus() {
   return { ...currentSync };
 }
 
-async function startSync() {
+function getLastSyncTime() {
+  const row = db.prepare(
+    "SELECT completed_at FROM sync_runs WHERE status='completed' ORDER BY id DESC LIMIT 1"
+  ).get();
+  return row ? row.completed_at : null;
+}
+
+async function startSync({ full = false } = {}) {
   if (currentSync.status === 'running') {
     throw Object.assign(new Error('Sync already in progress'), { status: 400 });
   }
@@ -68,8 +76,10 @@ async function startSync() {
     startedAt: new Date().toISOString(),
   };
 
+  const lastSync = full ? null : getLastSyncTime();
+
   // Run async without blocking the response
-  runSync(runId, token, properties, sizeProperty, networkProperty, launchedIds, contractStartProperty, contractEndProperty, contractRenewalProperty, launchDateProperty).catch((err) => {
+  runSync(runId, token, properties, sizeProperty, networkProperty, launchedIds, contractStartProperty, contractEndProperty, contractRenewalProperty, launchDateProperty, lastSync).catch((err) => {
     console.error('Sync failed:', err.message);
     currentSync.status = 'failed';
     currentSync.error = err.message;
@@ -84,8 +94,29 @@ async function startSync() {
   return { runId };
 }
 
-async function runSync(runId, token, properties, sizeProperty, networkProperty, launchedIds, contractStartProperty, contractEndProperty, contractRenewalProperty, launchDateProperty) {
-  const deals = await fetchAllDeals(token, properties);
+async function runSync(runId, token, properties, sizeProperty, networkProperty, launchedIds, contractStartProperty, contractEndProperty, contractRenewalProperty, launchDateProperty, lastSync) {
+  let deals;
+  let syncMode = 'full';
+
+  if (lastSync) {
+    // Try incremental sync — fetch only deals modified since last sync
+    const sinceMs = new Date(lastSync).getTime();
+    currentSync.phase = 'Fetching modified deals from HubSpot';
+    const result = await searchDealsSince(token, properties, sinceMs);
+
+    if (result.capped) {
+      // Over 10k changes — fall back to full sync
+      console.log(`Incremental sync found ${result.total} changes (>10k cap), falling back to full sync`);
+      currentSync.phase = 'Too many changes, running full sync';
+      deals = await fetchAllDeals(token, properties);
+    } else {
+      deals = result.deals;
+      syncMode = 'incremental';
+      console.log(`Incremental sync: ${deals.length} deals modified since ${lastSync}`);
+    }
+  } else {
+    deals = await fetchAllDeals(token, properties);
+  }
 
   currentSync.total = deals.length;
   currentSync.phase = `Saving ${deals.length} deals`;
@@ -139,9 +170,14 @@ async function runSync(runId, token, properties, sizeProperty, networkProperty, 
     'UPDATE sync_runs SET status=?, completed_at=?, deals_fetched=? WHERE id=?'
   ).run('completed', new Date().toISOString(), deals.length, runId);
 
+  // Save metrics snapshot for version control
+  saveSnapshot(runId, deals.length);
+
   currentSync.status = 'completed';
   currentSync.progress = deals.length;
-  currentSync.phase = 'Done';
+  currentSync.phase = syncMode === 'incremental'
+    ? `Done (incremental: ${deals.length} updated)`
+    : `Done (full: ${deals.length} deals)`;
 }
 
 module.exports = { startSync, getStatus };
