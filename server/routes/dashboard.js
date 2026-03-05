@@ -154,9 +154,9 @@ router.get('/', (req, res) => {
       .all(implementingIds);
   }
 
-  // Data range for live DB
+  // Data range for live DB — use launched_at for latest since timeframe filters on launched_at
   const dateRange = db.prepare(
-    'SELECT MIN(created_at) AS earliest, MAX(created_at) AS latest FROM deals'
+    'SELECT MIN(created_at) AS earliest, MAX(launched_at) AS latest FROM deals'
   ).get();
 
   res.json({
