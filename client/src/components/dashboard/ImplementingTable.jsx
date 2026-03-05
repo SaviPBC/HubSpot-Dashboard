@@ -11,7 +11,7 @@ function daysSince(iso) {
   return Math.floor(ms / (1000 * 60 * 60 * 24));
 }
 
-export default function ImplementingTable({ deals }) {
+export default function ImplementingTable({ deals, snapshotMode }) {
   const [sortCol, setSortCol] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
 
@@ -39,39 +39,53 @@ export default function ImplementingTable({ deals }) {
     return sortDir === 'asc' ? ' ↑' : ' ↓';
   }
 
+  // Snapshot mode: show anonymized columns (no name, no network)
+  const columns = snapshotMode
+    ? [['size_value', 'Size'], ['launched_at', 'Launch Date'], ['stage_id', 'Stage ID'], ['days', 'Days Active']]
+    : [['name', 'Name'], ['size_value', 'Size'], ['network_value', 'Network (Employers)'], ['launched_at', 'Launch Date'], ['stage_id', 'Stage ID'], ['days', 'Days Active']];
+
   return (
     <div style={cardStyle}>
       <h3 style={titleStyle}>Currently Implementing ({(deals || []).length})</h3>
       {!deals || deals.length === 0 ? (
-        <p style={{ color: '#888', fontSize: 14 }}>No deals in implementing stages.</p>
+        <p style={{ color: '#888', fontSize: 14 }}>
+          {snapshotMode ? 'No implementing deals in snapshot data.' : 'No deals in implementing stages.'}
+        </p>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                {[['name', 'Name'], ['size_value', 'Size'], ['network_value', 'Network (Employers)'], ['launched_at', 'Launch Date'], ['stage_id', 'Stage ID'], ['days', 'Days Active']].map(
-                  ([col, label]) => (
-                    <th key={col} style={thStyle} onClick={() => sort(col)}>
-                      {label}{arrow(col)}
-                    </th>
-                  )
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((deal, i) => (
-                <tr key={deal.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-                  <td style={tdStyle}>{deal.name}</td>
-                  <td style={tdStyle}>{deal.size_value || '—'}</td>
-                  <td style={tdStyle}>{deal.network_value || '—'}</td>
-                  <td style={tdStyle}>{fmtDate(deal.launched_at)}</td>
-                  <td style={tdStyle}>{deal.stage_id || '—'}</td>
-                  <td style={tdStyle}>{daysSince(deal.created_at) ?? '—'}</td>
+        <>
+          {snapshotMode && (
+            <p style={{ color: '#999', fontSize: 12, marginBottom: 12 }}>
+              Showing anonymized snapshot data. Sync HubSpot for full details.
+            </p>
+          )}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  {columns.map(
+                    ([col, label]) => (
+                      <th key={col} style={thStyle} onClick={() => sort(col)}>
+                        {label}{arrow(col)}
+                      </th>
+                    )
+                  )}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {sorted.map((deal, i) => (
+                  <tr key={deal.id || i} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                    {!snapshotMode && <td style={tdStyle}>{deal.name}</td>}
+                    <td style={tdStyle}>{deal.size_value || '—'}</td>
+                    {!snapshotMode && <td style={tdStyle}>{deal.network_value || '—'}</td>}
+                    <td style={tdStyle}>{fmtDate(deal.launched_at)}</td>
+                    <td style={tdStyle}>{deal.stage_id || '—'}</td>
+                    <td style={tdStyle}>{daysSince(deal.created_at) ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

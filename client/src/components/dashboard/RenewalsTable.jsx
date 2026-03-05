@@ -43,7 +43,7 @@ function rowBackground(days) {
   return 'transparent';
 }
 
-export default function RenewalsTable({ deals, loading, from, to, onFromChange, onToChange }) {
+export default function RenewalsTable({ deals, loading, from, to, onFromChange, onToChange, snapshotMode }) {
   const [sortKey, setSortKey] = useState('contract_end_date');
   const [sortDir, setSortDir] = useState('asc');
 
@@ -131,14 +131,22 @@ export default function RenewalsTable({ deals, loading, from, to, onFromChange, 
         <p style={{ color: '#888', fontSize: 13 }}>No contracts expiring in this date range.</p>
       )}
 
+      {!loading && sorted.length > 0 && snapshotMode && (
+        <p style={{ color: '#999', fontSize: 12, marginBottom: 12 }}>
+          Showing anonymized snapshot data. Sync HubSpot for full details.
+        </p>
+      )}
+
       {!loading && sorted.length > 0 && (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={thStyle} onClick={() => handleSort('name')}>
-                  Name{sortIndicator('name')}
-                </th>
+                {!snapshotMode && (
+                  <th style={thStyle} onClick={() => handleSort('name')}>
+                    Name{sortIndicator('name')}
+                  </th>
+                )}
                 <th style={thStyle} onClick={() => handleSort('contract_start_date')}>
                   Contract Start{sortIndicator('contract_start_date')}
                 </th>
@@ -157,11 +165,11 @@ export default function RenewalsTable({ deals, loading, from, to, onFromChange, 
               </tr>
             </thead>
             <tbody>
-              {sorted.map((deal) => {
+              {sorted.map((deal, i) => {
                 const days = daysUntil(deal.contract_end_date);
                 return (
-                  <tr key={deal.id} style={{ background: rowBackground(days) }}>
-                    <td style={tdStyle}>{deal.name || '(Unnamed)'}</td>
+                  <tr key={deal.id || i} style={{ background: rowBackground(days) }}>
+                    {!snapshotMode && <td style={tdStyle}>{deal.name || '(Unnamed)'}</td>}
                     <td style={tdStyle}>{formatDate(deal.contract_start_date)}</td>
                     <td style={tdStyle}>{formatDate(deal.contract_end_date)}</td>
                     <td style={{ ...tdStyle, fontWeight: days !== null && days <= 30 ? 700 : 400 }}>

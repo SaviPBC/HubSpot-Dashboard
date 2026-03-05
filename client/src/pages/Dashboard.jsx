@@ -23,6 +23,22 @@ function defaultRenewalDates() {
   return [from.toISOString().slice(0, 10), to.toISOString().slice(0, 10)];
 }
 
+function isOutsideDataRange(from, to, dataRange) {
+  if (!dataRange || !dataRange.earliest || !dataRange.latest) return false;
+  const earliest = dataRange.earliest.slice(0, 10);
+  const latest = dataRange.latest.slice(0, 10);
+  return from < earliest || to > latest;
+}
+
+function formatTimestamp(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
+}
+
 export default function Dashboard() {
   const [defaultFrom, defaultTo] = defaultDates();
   const [from, setFrom] = useState(defaultFrom);
@@ -34,6 +50,9 @@ export default function Dashboard() {
 
   const { data, isLoading, isError, error } = useDashboard(from, to);
   const { data: renewalsData, isLoading: renewalsLoading } = useRenewals(renewalsFrom, renewalsTo);
+
+  const snapshotMode = data?.source === 'snapshot';
+  const outsideRange = data && isOutsideDataRange(from, to, data.dataRange);
 
   return (
     <div>
@@ -65,23 +84,55 @@ export default function Dashboard() {
 
       {data && (
         <>
+          {snapshotMode && (
+            <div style={{
+              background: '#fff8e1',
+              border: '1px solid #ffe082',
+              borderRadius: 8,
+              padding: '12px 16px',
+              marginBottom: 20,
+              fontSize: 13,
+              color: '#6d4c00',
+            }}>
+              Showing metrics from last sync ({formatTimestamp(data.snapshotTimestamp)}). Sync HubSpot to see full deal details.
+            </div>
+          )}
+          {outsideRange && (
+            <div style={{
+              background: '#fce4ec',
+              border: '1px solid #ef9a9a',
+              borderRadius: 8,
+              padding: '12px 16px',
+              marginBottom: 20,
+              fontSize: 13,
+              color: '#b71c1c',
+            }}>
+              Selected timeframe extends beyond synced data (synced: {data.dataRange.earliest?.slice(0, 10)} to {data.dataRange.latest?.slice(0, 10)}). Results may be incomplete — sync to fetch more data.
+            </div>
+          )}
           <SummaryCards summary={data.summary} />
           <ClientSizeChart
             sizeDistribution={data.sizeDistribution}
             implementingSizeDistribution={data.implementingSizeDistribution}
           />
-          <ImplementingTable deals={data.implementing} />
-          <LaunchedTable deals={data.launched} />
+          <ImplementingTable deals={data.implementing} snapshotMode={snapshotMode} />
+          <LaunchedTable
+            deals={data.launched}
+            snapshotMode={snapshotMode}
+            launchedByMonth={data.launchedByMonth}
+            launchedBySize={data.launchedBySize}
+          />
         </>
       )}
 
       <RenewalsTable
-        deals={renewalsData || []}
+        deals={renewalsData?.deals || renewalsData || []}
         loading={renewalsLoading}
         from={renewalsFrom}
         to={renewalsTo}
         onFromChange={setRenewalsFrom}
         onToChange={setRenewalsTo}
+        snapshotMode={renewalsData?.source === 'snapshot'}
       />
     </div>
   );

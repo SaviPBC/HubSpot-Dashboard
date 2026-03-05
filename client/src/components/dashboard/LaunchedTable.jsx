@@ -5,7 +5,14 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-export default function LaunchedTable({ deals }) {
+function fmtMonth(monthStr) {
+  if (!monthStr) return '—';
+  const [y, m] = monthStr.split('-');
+  const d = new Date(Number(y), Number(m) - 1);
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+}
+
+export default function LaunchedTable({ deals, snapshotMode, launchedByMonth, launchedBySize }) {
   const [sortCol, setSortCol] = useState('launched_at');
   const [sortDir, setSortDir] = useState('desc');
 
@@ -27,9 +34,77 @@ export default function LaunchedTable({ deals }) {
     return sortDir === 'asc' ? ' ↑' : ' ↓';
   }
 
+  const totalLaunched = snapshotMode
+    ? (launchedByMonth || []).reduce((sum, r) => sum + r.count, 0)
+    : (deals || []).length;
+
+  // Snapshot mode: show aggregate metrics instead of deal rows
+  if (snapshotMode) {
+    const hasData = (launchedByMonth && launchedByMonth.length > 0) || (launchedBySize && launchedBySize.length > 0);
+    return (
+      <div style={cardStyle}>
+        <h3 style={titleStyle}>Launched in Period ({totalLaunched})</h3>
+        {!hasData ? (
+          <p style={{ color: '#888', fontSize: 14 }}>No launched deals in snapshot data for this period.</p>
+        ) : (
+          <>
+            <p style={{ color: '#999', fontSize: 12, marginBottom: 16 }}>
+              Showing aggregate metrics from snapshot. Sync HubSpot for individual deal details.
+            </p>
+            <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+              {launchedByMonth && launchedByMonth.length > 0 && (
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <h4 style={{ fontSize: 13, fontWeight: 600, color: '#555', marginBottom: 8 }}>By Month</h4>
+                  <table style={tableStyle}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Month</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {launchedByMonth.map((row, i) => (
+                        <tr key={row.month} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                          <td style={tdStyle}>{fmtMonth(row.month)}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {launchedBySize && launchedBySize.length > 0 && (
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <h4 style={{ fontSize: 13, fontWeight: 600, color: '#555', marginBottom: 8 }}>By Size</h4>
+                  <table style={tableStyle}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Size</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {launchedBySize.map((row, i) => (
+                        <tr key={row.size} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                          <td style={tdStyle}>{row.size}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Live DB mode: show full deal rows
   return (
     <div style={cardStyle}>
-      <h3 style={titleStyle}>Launched in Period ({(deals || []).length})</h3>
+      <h3 style={titleStyle}>Launched in Period ({totalLaunched})</h3>
       {!deals || deals.length === 0 ? (
         <p style={{ color: '#888', fontSize: 14 }}>No deals launched in this period.</p>
       ) : (

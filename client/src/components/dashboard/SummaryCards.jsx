@@ -11,7 +11,9 @@ function Card({ label, value, color }) {
   return (
     <div style={cardStyle}>
       <div style={{ fontSize: 13, color: '#888', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 32, fontWeight: 700, color: color || '#1a1a2e' }}>{value ?? '—'}</div>
+      <div style={{ fontSize: value === null ? 16 : 32, fontWeight: 700, color: value === null ? '#bbb' : (color || '#1a1a2e') }}>
+        {value === null ? 'Unknown' : (value ?? '—')}
+      </div>
     </div>
   );
 }
