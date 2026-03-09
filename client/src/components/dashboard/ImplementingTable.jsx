@@ -1,4 +1,24 @@
 import { useState } from 'react';
+import * as XLSX from 'xlsx';
+
+function exportToExcel(deals, snapshotMode) {
+  const rows = deals.map((deal) => {
+    const base = {
+      Size: deal.size_value || '',
+      'Launch Date': deal.launched_at ? new Date(deal.launched_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '',
+      'Stage ID': deal.stage_id || '',
+      'Days Active': deal.created_at ? Math.floor((Date.now() - new Date(deal.created_at).getTime()) / (1000 * 60 * 60 * 24)) : '',
+    };
+    if (!snapshotMode) {
+      return { Name: deal.name || '', 'Network (Employers)': deal.network_value || '', ...base };
+    }
+    return base;
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Currently Implementing');
+  XLSX.writeFile(wb, 'currently-implementing.xlsx');
+}
 
 function fmtDate(iso) {
   if (!iso) return '—';
@@ -46,7 +66,14 @@ export default function ImplementingTable({ deals, snapshotMode }) {
 
   return (
     <div style={cardStyle}>
-      <h3 style={titleStyle}>Currently Implementing ({(deals || []).length})</h3>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+        <h3 style={{ ...titleStyle, marginBottom: 0 }}>Currently Implementing ({(deals || []).length})</h3>
+        {(deals || []).length > 0 && (
+          <button onClick={() => exportToExcel(sorted, snapshotMode)} style={exportBtnStyle}>
+            Export to Excel
+          </button>
+        )}
+      </div>
       {!deals || deals.length === 0 ? (
         <p style={{ color: '#888', fontSize: 14 }}>
           {snapshotMode ? 'No implementing deals in snapshot data.' : 'No deals in implementing stages.'}
@@ -98,7 +125,18 @@ const cardStyle = {
   boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
   marginBottom: 24,
 };
-const titleStyle = { fontSize: 15, fontWeight: 600, marginBottom: 16, color: '#1a1a2e' };
+const titleStyle = { fontSize: 15, fontWeight: 600, color: '#1a1a2e' };
+const exportBtnStyle = {
+  marginLeft: 'auto',
+  padding: '5px 12px',
+  fontSize: 12,
+  fontWeight: 600,
+  color: '#fff',
+  background: '#217346',
+  border: 'none',
+  borderRadius: 5,
+  cursor: 'pointer',
+};
 const tableStyle = { width: '100%', borderCollapse: 'collapse', fontSize: 13 };
 const thStyle = {
   textAlign: 'left',

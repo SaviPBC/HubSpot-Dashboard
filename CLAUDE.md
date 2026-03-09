@@ -2,10 +2,11 @@
 
 ## Version & Changelog
 
-**Current version: 1.2.0**
+**Current version: 1.3.0**
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.3.0 | 2026-03-09 | Add Excel export to Currently Implementing, Launched in Period, and Contracts Up for Renewal tables (`xlsx` library, client-side) |
 | 1.2.0 | 2026-03-04 | Incremental sync — only fetch deals modified since last sync via HubSpot Search API, with automatic fallback to full sync |
 | 1.1.0 | 2026-03-04 | Add metric snapshots — auto-export summary metrics to `server/data/snapshots.json` after each sync, committed to git for historical tracking |
 | 1.0.0 | 2026-03-04 | Initial release — dashboard with implementing/launched tables, size charts, renewals, settings UI, HubSpot sync |
@@ -18,6 +19,7 @@
 - **Database:** SQLite via `node-sqlite3-wasm` (NOT better-sqlite3 — Node v24 has no prebuilt binaries)
 - **Charts:** Recharts
 - **Data fetching:** @tanstack/react-query
+- **Excel export:** xlsx (client-side, used in ImplementingTable, LaunchedTable, RenewalsTable)
 
 ## Running
 ```bash

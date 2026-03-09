@@ -1,4 +1,47 @@
 import { useState } from 'react';
+import * as XLSX from 'xlsx';
+
+function exportToExcel(deals, snapshotMode) {
+  const rows = deals.map((deal) => {
+    const endDate = deal.contract_end_date
+      ? (isNaN(Number(deal.contract_end_date)) ? new Date(deal.contract_end_date) : new Date(Number(deal.contract_end_date)))
+      : null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const daysUntilExpiry = endDate && !isNaN(endDate.getTime())
+      ? Math.ceil((endDate.getTime() - today.getTime()) / 86400000)
+      : null;
+    const fmt = (d) => {
+      if (!d) return '';
+      const parsed = isNaN(Number(d)) ? new Date(d) : new Date(Number(d));
+      return isNaN(parsed.getTime()) ? d : parsed.toLocaleDateString();
+    };
+    const base = {
+      'Contract Start': fmt(deal.contract_start_date),
+      'Contract End': fmt(deal.contract_end_date),
+      'Days Until Expiry': daysUntilExpiry !== null ? daysUntilExpiry : '',
+      'Renewal Date': fmt(deal.contract_renewal_date),
+      Stage: deal.stage_id || '',
+    };
+    if (!snapshotMode) return { Name: deal.name || '', ...base };
+    return base;
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Contracts for Renewal');
+  XLSX.writeFile(wb, 'contracts-for-renewal.xlsx');
+}
+
+const exportBtnStyle = {
+  padding: '5px 12px',
+  fontSize: 12,
+  fontWeight: 600,
+  color: '#fff',
+  background: '#217346',
+  border: 'none',
+  borderRadius: 5,
+  cursor: 'pointer',
+};
 
 const thStyle = {
   padding: '10px 14px',
@@ -96,6 +139,11 @@ export default function RenewalsTable({ deals, loading, from, to, onFromChange, 
           Contracts Up for Renewal
         </h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
+          {sorted.length > 0 && (
+            <button onClick={() => exportToExcel(sorted, snapshotMode)} style={exportBtnStyle}>
+              Export to Excel
+            </button>
+          )}
           <span style={{ fontSize: 13, color: '#666' }}>From:</span>
           <input
             type="date"

@@ -1,4 +1,32 @@
 import { useState } from 'react';
+import * as XLSX from 'xlsx';
+
+function exportToExcel(deals, launchedByMonth, launchedBySize, snapshotMode) {
+  const wb = XLSX.utils.book_new();
+  if (snapshotMode) {
+    if (launchedByMonth && launchedByMonth.length > 0) {
+      const rows = launchedByMonth.map((r) => {
+        const [y, m] = r.month.split('-');
+        const label = new Date(Number(y), Number(m) - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+        return { Month: label, Count: r.count };
+      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'By Month');
+    }
+    if (launchedBySize && launchedBySize.length > 0) {
+      const rows = launchedBySize.map((r) => ({ Size: r.size, Count: r.count }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'By Size');
+    }
+  } else {
+    const rows = deals.map((deal) => ({
+      Name: deal.name || '',
+      Size: deal.size_value || '',
+      'Network (Employers)': deal.network_value || '',
+      'Launch Date': deal.launched_at ? new Date(deal.launched_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '',
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Launched in Period');
+  }
+  XLSX.writeFile(wb, 'launched-in-period.xlsx');
+}
 
 function fmtDate(iso) {
   if (!iso) return '—';
@@ -43,7 +71,14 @@ export default function LaunchedTable({ deals, snapshotMode, launchedByMonth, la
     const hasData = (launchedByMonth && launchedByMonth.length > 0) || (launchedBySize && launchedBySize.length > 0);
     return (
       <div style={cardStyle}>
-        <h3 style={titleStyle}>Launched in Period ({totalLaunched})</h3>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ ...titleStyle, marginBottom: 0 }}>Launched in Period ({totalLaunched})</h3>
+          {hasData && (
+            <button onClick={() => exportToExcel([], launchedByMonth, launchedBySize, true)} style={exportBtnStyle}>
+              Export to Excel
+            </button>
+          )}
+        </div>
         {!hasData ? (
           <p style={{ color: '#888', fontSize: 14 }}>No launched deals in snapshot data for this period.</p>
         ) : (
@@ -104,7 +139,14 @@ export default function LaunchedTable({ deals, snapshotMode, launchedByMonth, la
   // Live DB mode: show full deal rows
   return (
     <div style={cardStyle}>
-      <h3 style={titleStyle}>Launched in Period ({totalLaunched})</h3>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+        <h3 style={{ ...titleStyle, marginBottom: 0 }}>Launched in Period ({totalLaunched})</h3>
+        {(deals || []).length > 0 && (
+          <button onClick={() => exportToExcel(sorted, null, null, false)} style={exportBtnStyle}>
+            Export to Excel
+          </button>
+        )}
+      </div>
       {!deals || deals.length === 0 ? (
         <p style={{ color: '#888', fontSize: 14 }}>No deals launched in this period.</p>
       ) : (
@@ -145,7 +187,18 @@ const cardStyle = {
   boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
   marginBottom: 24,
 };
-const titleStyle = { fontSize: 15, fontWeight: 600, marginBottom: 16, color: '#1a1a2e' };
+const titleStyle = { fontSize: 15, fontWeight: 600, color: '#1a1a2e' };
+const exportBtnStyle = {
+  marginLeft: 'auto',
+  padding: '5px 12px',
+  fontSize: 12,
+  fontWeight: 600,
+  color: '#fff',
+  background: '#217346',
+  border: 'none',
+  borderRadius: 5,
+  cursor: 'pointer',
+};
 const tableStyle = { width: '100%', borderCollapse: 'collapse', fontSize: 13 };
 const thStyle = {
   textAlign: 'left',
