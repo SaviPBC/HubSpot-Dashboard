@@ -142,6 +142,15 @@ async function searchDealsSince(token, properties, sinceMs) {
   return { deals, capped: false, total: deals.length };
 }
 
+async function getPortalId(token) {
+  const client = buildClient(token);
+  const res = await requestWithRetry(client, {
+    method: 'GET',
+    url: '/account-info/v3/details',
+  });
+  return res.data.portalId;
+}
+
 async function testConnection(token) {
   const client = buildClient(token);
   await requestWithRetry(client, {
@@ -151,4 +160,4 @@ async function testConnection(token) {
   });
 }
 
-module.exports = { getProperties, getPipelines, fetchAllDeals, searchDealsSince, testConnection };
+module.exports = { getProperties, getPipelines, getPortalId, fetchAllDeals, searchDealsSince, testConnection };

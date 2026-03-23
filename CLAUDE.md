@@ -2,10 +2,13 @@
 
 ## Version & Changelog
 
-**Current version: 1.3.0**
+**Current version: 1.6.0**
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.6.0 | 2026-03-10 | Split dashboard into separate left-nav tabs (Overview, About to Implement, Currently Implementing, Launched in Period, Contracts for Renewal); remove client size distribution chart |
+| 1.5.0 | 2026-03-10 | Add Pricing Model + Deal Source columns (configurable properties in Settings) to all 4 tables; add per-column filter inputs to all tables |
+| 1.4.0 | 2026-03-10 | Deal name links to HubSpot deal card (new tab); Stage column shows stage name instead of raw ID; `pipeline_stages` table stores stage mappings; portal ID fetched and stored during sync |
 | 1.3.0 | 2026-03-09 | Add Excel export to Currently Implementing, Launched in Period, and Contracts Up for Renewal tables (`xlsx` library, client-side) |
 | 1.2.0 | 2026-03-04 | Incremental sync — only fetch deals modified since last sync via HubSpot Search API, with automatic fallback to full sync |
 | 1.1.0 | 2026-03-04 | Add metric snapshots — auto-export summary metrics to `server/data/snapshots.json` after each sync, committed to git for historical tracking |
@@ -33,7 +36,7 @@ Server requires no `.env` — set HubSpot API token via the Settings UI (stored 
 ## Project Structure
 ```
 client/src/
-  pages/               # Dashboard.jsx, Settings.jsx
+  pages/               # Dashboard.jsx (overview), AboutToImplement.jsx, Implementing.jsx, Launched.jsx, Renewals.jsx, Settings.jsx
   components/
     dashboard/         # ImplementingTable, LaunchedTable, RenewalsTable, ClientSizeChart, SummaryCards
     layout/            # AppShell.jsx
@@ -73,8 +76,9 @@ server/
 ### Tables
 | Table | Purpose |
 |-------|---------|
-| `settings` | Key/value config (API token, property mappings, stage IDs) |
+| `settings` | Key/value config (API token, property mappings, stage IDs, portal ID) |
 | `deals` | Raw HubSpot deal data (id, name, pipeline, stage, dates, size, network) |
+| `pipeline_stages` | Stage ID → label mapping (populated during sync via Pipelines API) |
 | `sync_runs` | Audit log of sync operations (start, end, status, deal count, errors) |
 
 ### Settings (stored in `settings` table)
@@ -89,6 +93,9 @@ server/
 | `contract_renewal_property` | Deal property for renewal date |
 | `implementing_stage_ids` | JSON array of stage IDs = "Implementing" |
 | `launched_stage_ids` | JSON array of stage IDs = "Launched" |
+| `hubspot_portal_id` | HubSpot portal/account ID (fetched during sync, used for deal card links) |
+| `pricing_model_property` | Deal property for Pricing Model |
+| `deal_source_property` | Deal property for Deal Source |
 
 ---
 
@@ -152,6 +159,30 @@ By default, sync uses the HubSpot Search API (`POST /crm/v3/objects/deals/search
 7. Display in table components
 
 ---
+
+## Webinar Comparison (added 2026-03-20)
+New section under **Sections** nav: **Webinar Comparison** (`/webinar-comparison`)
+
+### Routes added
+- `POST /api/webinar/sync/zoom` — Server-to-Server OAuth, syncs past webinars + participants
+- `POST /api/webinar/sync/eventbrite` — syncs events + attendees via continuation pagination
+- `POST /api/webinar/enrich` — batch-fetches contact emails from HubSpot for all deals (improves match accuracy)
+- `GET /api/webinar/compare?quarter=Q1&year=2024` — returns launched clients vs webinar attendees with overlap stats
+- `POST /api/webinar/analyze` — SSE stream, Claude Sonnet generates engagement analysis
+- `GET /api/webinar/status` — sync counts and last-synced timestamps
+
+### Matching logic
+Primary: email match (requires running "Enrich Emails" first — calls HubSpot batch contact associations API).
+Fallback: name-based keyword match (deal name words vs attendee name).
+`match_method` field on each client indicates which was used.
+
+### New DB tables
+`zoom_webinars`, `zoom_attendees`, `eventbrite_events`, `eventbrite_attendees`
+New column on `deals`: `contact_email` (populated by enrich endpoint)
+
+### New settings keys
+`zoom_account_id`, `zoom_client_id`, `zoom_client_secret`, `eventbrite_token`, `eventbrite_org_id`, `anthropic_api_key`
+All editable in Settings UI (new Zoom, Eventbrite, AI Analysis cards at bottom of Settings page).
 
 ## TODO
 

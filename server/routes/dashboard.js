@@ -54,6 +54,12 @@ router.get('/', (req, res) => {
 
   const implementingIds = JSON.parse(getSetting('implementing_stage_ids') || '[]');
   const launchedIds = JSON.parse(getSetting('launched_stage_ids') || '[]');
+  const aboutToImplementIds = JSON.parse(getSetting('about_to_implement_stage_ids') || '[]');
+
+  // Build stage name map from stored pipeline stages
+  const stageRows = db.prepare('SELECT id, label FROM pipeline_stages').all();
+  const stageMap = Object.fromEntries(stageRows.map((s) => [s.id, s.label]));
+  const portalId = getSetting('hubspot_portal_id') || null;
 
   // Total deals in DB
   const { total } = db.prepare('SELECT COUNT(*) AS total FROM deals').get();
@@ -91,12 +97,28 @@ router.get('/', (req, res) => {
         },
         sizeDistribution: bucketSizeDistribution(m.size_distribution || []),
         implementingSizeDistribution: bucketSizeDistribution(m.implementing_size_distribution || []),
+        aboutToImplement: [],
         implementing: m.implementing_deals || [],
         launched: [],
         launchedByMonth,
         launchedBySize,
+        stageMap,
+        portalId,
       });
     }
+  }
+
+  // About to implement: deals in survey-sent / survey-completed stages
+  let aboutToImplement = [];
+  if (aboutToImplementIds.length > 0) {
+    const placeholders = aboutToImplementIds.map(() => '?').join(',');
+    aboutToImplement = db
+      .prepare(
+        `SELECT id, name, pipeline, stage_id, size_value, network_value, pricing_model, deal_source, created_at, launched_at
+         FROM deals WHERE stage_id IN (${placeholders})
+         ORDER BY created_at DESC`
+      )
+      .all(aboutToImplementIds);
   }
 
   // Currently implementing: deals whose stage_id is in the implementing list
@@ -105,7 +127,7 @@ router.get('/', (req, res) => {
     const placeholders = implementingIds.map(() => '?').join(',');
     implementing = db
       .prepare(
-        `SELECT id, name, pipeline, stage_id, size_value, network_value, created_at, launched_at
+        `SELECT id, name, pipeline, stage_id, size_value, network_value, pricing_model, deal_source, created_at, launched_at
          FROM deals WHERE stage_id IN (${placeholders})
          ORDER BY created_at DESC`
       )
@@ -116,7 +138,7 @@ router.get('/', (req, res) => {
   // (regardless of current stage — a deal may have moved forward after being launched)
   let launched = [];
   if (launchedIds.length > 0) {
-    let launchedQuery = `SELECT id, name, pipeline, stage_id, size_value, network_value, created_at, launched_at
+    let launchedQuery = `SELECT id, name, pipeline, stage_id, size_value, network_value, pricing_model, deal_source, created_at, launched_at
        FROM deals WHERE launched_at IS NOT NULL`;
     const params = [];
 
@@ -169,8 +191,11 @@ router.get('/', (req, res) => {
     },
     sizeDistribution: bucketSizeDistribution(sizeRows),
     implementingSizeDistribution: bucketSizeDistribution(implementingSizeDist),
+    aboutToImplement,
     implementing,
     launched,
+    stageMap,
+    portalId,
   });
 });
 

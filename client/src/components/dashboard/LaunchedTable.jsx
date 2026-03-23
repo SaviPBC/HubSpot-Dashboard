@@ -1,6 +1,18 @@
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
 
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function fmtMonth(monthStr) {
+  if (!monthStr) return '—';
+  const [y, m] = monthStr.split('-');
+  const d = new Date(Number(y), Number(m) - 1);
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+}
+
 function exportToExcel(deals, launchedByMonth, launchedBySize, snapshotMode) {
   const wb = XLSX.utils.book_new();
   if (snapshotMode) {
@@ -21,6 +33,8 @@ function exportToExcel(deals, launchedByMonth, launchedBySize, snapshotMode) {
       Name: deal.name || '',
       Size: deal.size_value || '',
       'Network (Employers)': deal.network_value || '',
+      'Pricing Model': deal.pricing_model || '',
+      'Deal Source': deal.deal_source || '',
       'Launch Date': deal.launched_at ? new Date(deal.launched_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '',
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Launched in Period');
@@ -28,26 +42,33 @@ function exportToExcel(deals, launchedByMonth, launchedBySize, snapshotMode) {
   XLSX.writeFile(wb, 'launched-in-period.xlsx');
 }
 
-function fmtDate(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+function getCellValue(deal, col) {
+  if (col === 'launched_at') return fmtDate(deal.launched_at);
+  return String(deal[col] || '');
 }
 
-function fmtMonth(monthStr) {
-  if (!monthStr) return '—';
-  const [y, m] = monthStr.split('-');
-  const d = new Date(Number(y), Number(m) - 1);
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
-}
-
-export default function LaunchedTable({ deals, snapshotMode, launchedByMonth, launchedBySize }) {
+export default function LaunchedTable({ deals, snapshotMode, launchedByMonth, launchedBySize, portalId }) {
   const [sortCol, setSortCol] = useState('launched_at');
   const [sortDir, setSortDir] = useState('desc');
+  const [filters, setFilters] = useState({});
 
   function sort(col) {
     if (sortCol === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else { setSortCol(col); setSortDir('asc'); }
   }
+
+  function setFilter(col, val) {
+    setFilters((f) => ({ ...f, [col]: val }));
+  }
+
+  const columns = [
+    ['name', 'Name'],
+    ['size_value', 'Size'],
+    ['network_value', 'Network (Employers)'],
+    ['pricing_model', 'Pricing Model'],
+    ['deal_source', 'Deal Source'],
+    ['launched_at', 'Launch Date'],
+  ];
 
   const sorted = [...(deals || [])].sort((a, b) => {
     const va = (a[sortCol] || '').toLowerCase();
@@ -57,6 +78,14 @@ export default function LaunchedTable({ deals, snapshotMode, launchedByMonth, la
     return 0;
   });
 
+  const filtered = sorted.filter((deal) =>
+    columns.every(([col]) => {
+      const f = (filters[col] || '').toLowerCase();
+      if (!f) return true;
+      return getCellValue(deal, col).toLowerCase().includes(f);
+    })
+  );
+
   function arrow(col) {
     if (sortCol !== col) return ' ↕';
     return sortDir === 'asc' ? ' ↑' : ' ↓';
@@ -65,6 +94,8 @@ export default function LaunchedTable({ deals, snapshotMode, launchedByMonth, la
   const totalLaunched = snapshotMode
     ? (launchedByMonth || []).reduce((sum, r) => sum + r.count, 0)
     : (deals || []).length;
+
+  const hasFilters = Object.values(filters).some(Boolean);
 
   // Snapshot mode: show aggregate metrics instead of deal rows
   if (snapshotMode) {
@@ -140,9 +171,11 @@ export default function LaunchedTable({ deals, snapshotMode, launchedByMonth, la
   return (
     <div style={cardStyle}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-        <h3 style={{ ...titleStyle, marginBottom: 0 }}>Launched in Period ({totalLaunched})</h3>
+        <h3 style={{ ...titleStyle, marginBottom: 0 }}>
+          Launched in Period ({filtered.length}{hasFilters ? ` of ${totalLaunched}` : ''})
+        </h3>
         {(deals || []).length > 0 && (
-          <button onClick={() => exportToExcel(sorted, null, null, false)} style={exportBtnStyle}>
+          <button onClick={() => exportToExcel(filtered, null, null, false)} style={exportBtnStyle}>
             Export to Excel
           </button>
         )}
@@ -154,24 +187,48 @@ export default function LaunchedTable({ deals, snapshotMode, launchedByMonth, la
           <table style={tableStyle}>
             <thead>
               <tr>
-                {[['name', 'Name'], ['size_value', 'Size'], ['network_value', 'Network (Employers)'], ['launched_at', 'Launch Date']].map(
-                  ([col, label]) => (
-                    <th key={col} style={thStyle} onClick={() => sort(col)}>
-                      {label}{arrow(col)}
-                    </th>
-                  )
-                )}
+                {columns.map(([col, label]) => (
+                  <th key={col} style={thStyle} onClick={() => sort(col)}>
+                    {label}{arrow(col)}
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                {columns.map(([col]) => (
+                  <th key={col} style={filterThStyle}>
+                    <input
+                      style={filterInputStyle}
+                      placeholder="Filter…"
+                      value={filters[col] || ''}
+                      onChange={(e) => setFilter(col, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {sorted.map((deal, i) => (
+              {filtered.map((deal, i) => (
                 <tr key={deal.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-                  <td style={tdStyle}>{deal.name}</td>
+                  <td style={tdStyle}>
+                    {portalId ? (
+                      <a href={`https://app.hubspot.com/contacts/${portalId}/deal/${deal.id}`} target="_blank" rel="noreferrer" style={{ color: '#1a56db', textDecoration: 'none', fontWeight: 500 }}>{deal.name}</a>
+                    ) : deal.name}
+                  </td>
                   <td style={tdStyle}>{deal.size_value || '—'}</td>
                   <td style={tdStyle}>{deal.network_value || '—'}</td>
+                  <td style={tdStyle}>{deal.pricing_model || '—'}</td>
+                  <td style={tdStyle}>{deal.deal_source || '—'}</td>
                   <td style={tdStyle}>{fmtDate(deal.launched_at)}</td>
                 </tr>
               ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={columns.length} style={{ ...tdStyle, color: '#aaa', textAlign: 'center', padding: '16px 12px' }}>
+                    No results match the current filters.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -203,11 +260,25 @@ const tableStyle = { width: '100%', borderCollapse: 'collapse', fontSize: 13 };
 const thStyle = {
   textAlign: 'left',
   padding: '8px 12px',
-  borderBottom: '2px solid #eee',
+  borderBottom: '1px solid #eee',
   color: '#555',
   fontWeight: 600,
   cursor: 'pointer',
   whiteSpace: 'nowrap',
   userSelect: 'none',
+};
+const filterThStyle = {
+  padding: '4px 8px',
+  borderBottom: '2px solid #eee',
+  background: '#fafafa',
+};
+const filterInputStyle = {
+  width: '100%',
+  padding: '3px 6px',
+  fontSize: 11,
+  border: '1px solid #ddd',
+  borderRadius: 4,
+  fontFamily: 'inherit',
+  boxSizing: 'border-box',
 };
 const tdStyle = { padding: '8px 12px', borderBottom: '1px solid #f0f0f0', color: '#333' };

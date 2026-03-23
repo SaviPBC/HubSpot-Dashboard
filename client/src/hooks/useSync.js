@@ -31,7 +31,7 @@ export function useSync() {
   useEffect(() => () => stopPolling(), []);
 
   const trigger = useMutation({
-    mutationFn: () => client.post('/sync').then((r) => r.data),
+    mutationFn: ({ full = false } = {}) => client.post(`/sync${full ? '?full=true' : ''}`).then((r) => r.data),
     onSuccess: () => startPolling(),
     onError: (err) => setStatus({ status: 'failed', error: err.response?.data?.error || err.message }),
   });

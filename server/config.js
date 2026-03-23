@@ -8,4 +8,6 @@ module.exports = {
   port: parseInt(optional('PORT', '3003'), 10),
   dbPath: optional('DB_PATH', './data/hubspot.db'),
   hubspotApiToken: optional('HUBSPOT_API_TOKEN', ''),
+  jwtSecretKey: optional('JWT_SECRET_KEY', ''),
+  saviAuthConfigPath: optional('SAVI_AUTH_CONFIG_PATH', ''),
 };

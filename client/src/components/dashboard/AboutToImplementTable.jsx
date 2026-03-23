@@ -1,27 +1,6 @@
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
 
-function exportToExcel(deals, snapshotMode, stageMap) {
-  const rows = deals.map((deal) => {
-    const base = {
-      Size: deal.size_value || '',
-      'Launch Date': deal.launched_at ? new Date(deal.launched_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '',
-      Stage: (stageMap && stageMap[deal.stage_id]) || deal.stage_id || '',
-      'Pricing Model': deal.pricing_model || '',
-      'Deal Source': deal.deal_source || '',
-      'Days Active': deal.created_at ? Math.floor((Date.now() - new Date(deal.created_at).getTime()) / (1000 * 60 * 60 * 24)) : '',
-    };
-    if (!snapshotMode) {
-      return { Name: deal.name || '', 'Network (Employers)': deal.network_value || '', ...base };
-    }
-    return base;
-  });
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Currently Implementing');
-  XLSX.writeFile(wb, 'currently-implementing.xlsx');
-}
-
 function fmtDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -29,18 +8,36 @@ function fmtDate(iso) {
 
 function daysSince(iso) {
   if (!iso) return null;
-  const ms = Date.now() - new Date(iso).getTime();
-  return Math.floor(ms / (1000 * 60 * 60 * 24));
+  return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function exportToExcel(deals, stageMap) {
+  const rows = deals.map((deal) => ({
+    Name: deal.name || '',
+    Size: deal.size_value || '',
+    'Network (Employers)': deal.network_value || '',
+    Stage: (stageMap && stageMap[deal.stage_id]) || deal.stage_id || '',
+    'Pricing Model': deal.pricing_model || '',
+    'Deal Source': deal.deal_source || '',
+    'Launch Date': fmtDate(deal.launched_at),
+    'Created Date': fmtDate(deal.created_at),
+    'Days in Stage': daysSince(deal.created_at) ?? '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'About to Implement');
+  XLSX.writeFile(wb, 'clients-about-to-implement.xlsx');
 }
 
 function getCellValue(deal, col, stageMap) {
   if (col === 'days') return String(daysSince(deal.created_at) ?? '');
   if (col === 'launched_at') return fmtDate(deal.launched_at);
+  if (col === 'created_at') return fmtDate(deal.created_at);
   if (col === 'stage_id') return (stageMap && stageMap[deal.stage_id]) || deal.stage_id || '';
   return String(deal[col] || '');
 }
 
-export default function ImplementingTable({ deals, snapshotMode, stageMap, portalId }) {
+export default function AboutToImplementTable({ deals, snapshotMode, stageMap, portalId }) {
   const [sortCol, setSortCol] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const [filters, setFilters] = useState({});
@@ -54,9 +51,17 @@ export default function ImplementingTable({ deals, snapshotMode, stageMap, porta
     setFilters((f) => ({ ...f, [col]: val }));
   }
 
-  const columns = snapshotMode
-    ? [['size_value', 'Size'], ['launched_at', 'Launch Date'], ['stage_id', 'Stage'], ['pricing_model', 'Pricing Model'], ['deal_source', 'Deal Source'], ['days', 'Days Active']]
-    : [['name', 'Name'], ['size_value', 'Size'], ['network_value', 'Network (Employers)'], ['launched_at', 'Launch Date'], ['stage_id', 'Stage'], ['pricing_model', 'Pricing Model'], ['deal_source', 'Deal Source'], ['days', 'Days Active']];
+  const columns = [
+    ...(!snapshotMode ? [['name', 'Name']] : []),
+    ['size_value', 'Size'],
+    ...(!snapshotMode ? [['network_value', 'Network (Employers)']] : []),
+    ['stage_id', 'Stage'],
+    ['pricing_model', 'Pricing Model'],
+    ['deal_source', 'Deal Source'],
+    ['launched_at', 'Launch Date'],
+    ['created_at', 'Created'],
+    ['days', 'Days in Stage'],
+  ];
 
   const sorted = [...(deals || [])].sort((a, b) => {
     let va, vb;
@@ -90,18 +95,20 @@ export default function ImplementingTable({ deals, snapshotMode, stageMap, porta
   return (
     <div style={cardStyle}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-        <h3 style={{ ...titleStyle, marginBottom: 0 }}>
-          Currently Implementing ({filtered.length}{hasFilters ? ` of ${(deals || []).length}` : ''})
+        <h3 style={titleStyle}>
+          Clients About to Implement ({filtered.length}{hasFilters ? ` of ${(deals || []).length}` : ''})
         </h3>
         {(deals || []).length > 0 && (
-          <button onClick={() => exportToExcel(filtered, snapshotMode, stageMap)} style={exportBtnStyle}>
+          <button onClick={() => exportToExcel(filtered, stageMap)} style={exportBtnStyle}>
             Export to Excel
           </button>
         )}
       </div>
       {!deals || deals.length === 0 ? (
         <p style={{ color: '#888', fontSize: 14 }}>
-          {snapshotMode ? 'No implementing deals in snapshot data.' : 'No deals in implementing stages.'}
+          {snapshotMode
+            ? 'No about-to-implement deals in snapshot data.'
+            : 'No deals in survey sent / survey completed stages.'}
         </p>
       ) : (
         <>
@@ -146,10 +153,11 @@ export default function ImplementingTable({ deals, snapshotMode, stageMap, porta
                     )}
                     <td style={tdStyle}>{deal.size_value || '—'}</td>
                     {!snapshotMode && <td style={tdStyle}>{deal.network_value || '—'}</td>}
-                    <td style={tdStyle}>{fmtDate(deal.launched_at)}</td>
                     <td style={tdStyle}>{(stageMap && stageMap[deal.stage_id]) || deal.stage_id || '—'}</td>
                     <td style={tdStyle}>{deal.pricing_model || '—'}</td>
                     <td style={tdStyle}>{deal.deal_source || '—'}</td>
+                    <td style={tdStyle}>{fmtDate(deal.launched_at)}</td>
+                    <td style={tdStyle}>{fmtDate(deal.created_at)}</td>
                     <td style={tdStyle}>{daysSince(deal.created_at) ?? '—'}</td>
                   </tr>
                 ))}

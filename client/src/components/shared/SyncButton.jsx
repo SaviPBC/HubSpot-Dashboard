@@ -10,9 +10,9 @@ export default function SyncButton() {
       : 0;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <button
-        onClick={() => trigger.mutate()}
+        onClick={() => trigger.mutate({})}
         disabled={isRunning}
         style={{
           padding: '8px 18px',
@@ -26,6 +26,23 @@ export default function SyncButton() {
         }}
       >
         {isRunning ? 'Syncing...' : 'Sync Now'}
+      </button>
+      <button
+        onClick={() => trigger.mutate({ full: true })}
+        disabled={isRunning}
+        title="Re-fetch all deals from HubSpot (use after adding new property mappings)"
+        style={{
+          padding: '8px 14px',
+          background: isRunning ? '#ccc' : '#f0f0f0',
+          color: isRunning ? '#999' : '#555',
+          border: '1px solid #ddd',
+          borderRadius: 6,
+          cursor: isRunning ? 'not-allowed' : 'pointer',
+          fontWeight: 600,
+          fontSize: 13,
+        }}
+      >
+        Full Sync
       </button>
 
       {isRunning && (

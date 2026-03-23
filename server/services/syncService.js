@@ -1,5 +1,5 @@
 const db = require('../db');
-const { fetchAllDeals, searchDealsSince } = require('./hubspotClient');
+const { fetchAllDeals, searchDealsSince, getPipelines, getPortalId } = require('./hubspotClient');
 const { saveSnapshot } = require('./snapshotService');
 
 let currentSync = {
@@ -42,6 +42,8 @@ async function startSync({ full = false } = {}) {
   const contractEndProperty = getSetting('contract_end_property') || '';
   const contractRenewalProperty = getSetting('contract_renewal_property') || '';
   const launchDateProperty = getSetting('launch_date_property') || '';
+  const pricingModelProperty = getSetting('pricing_model_property') || '';
+  const dealSourceProperty = getSetting('deal_source_property') || '';
 
   // Build the property list to request
   const properties = [
@@ -58,6 +60,8 @@ async function startSync({ full = false } = {}) {
   if (contractEndProperty) properties.push(contractEndProperty);
   if (contractRenewalProperty) properties.push(contractRenewalProperty);
   if (launchDateProperty) properties.push(launchDateProperty);
+  if (pricingModelProperty) properties.push(pricingModelProperty);
+  if (dealSourceProperty) properties.push(dealSourceProperty);
 
   // Start run record
   const run = db
@@ -79,7 +83,7 @@ async function startSync({ full = false } = {}) {
   const lastSync = full ? null : getLastSyncTime();
 
   // Run async without blocking the response
-  runSync(runId, token, properties, sizeProperty, networkProperty, launchedIds, contractStartProperty, contractEndProperty, contractRenewalProperty, launchDateProperty, lastSync).catch((err) => {
+  runSync(runId, token, properties, sizeProperty, networkProperty, launchedIds, contractStartProperty, contractEndProperty, contractRenewalProperty, launchDateProperty, pricingModelProperty, dealSourceProperty, lastSync).catch((err) => {
     console.error('Sync failed:', err.message);
     currentSync.status = 'failed';
     currentSync.error = err.message;
@@ -94,7 +98,7 @@ async function startSync({ full = false } = {}) {
   return { runId };
 }
 
-async function runSync(runId, token, properties, sizeProperty, networkProperty, launchedIds, contractStartProperty, contractEndProperty, contractRenewalProperty, launchDateProperty, lastSync) {
+async function runSync(runId, token, properties, sizeProperty, networkProperty, launchedIds, contractStartProperty, contractEndProperty, contractRenewalProperty, launchDateProperty, pricingModelProperty, dealSourceProperty, lastSync) {
   let deals;
   let syncMode = 'full';
 
@@ -122,8 +126,8 @@ async function runSync(runId, token, properties, sizeProperty, networkProperty, 
   currentSync.phase = `Saving ${deals.length} deals`;
 
   const upsert = db.prepare(`
-    INSERT INTO deals (id, name, pipeline, stage_id, size_value, network_value, created_at, close_date, launched_at, contract_start_date, contract_end_date, contract_renewal_date, synced_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO deals (id, name, pipeline, stage_id, size_value, network_value, created_at, close_date, launched_at, contract_start_date, contract_end_date, contract_renewal_date, pricing_model, deal_source, synced_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       name=excluded.name,
       pipeline=excluded.pipeline,
@@ -136,6 +140,8 @@ async function runSync(runId, token, properties, sizeProperty, networkProperty, 
       contract_start_date=excluded.contract_start_date,
       contract_end_date=excluded.contract_end_date,
       contract_renewal_date=excluded.contract_renewal_date,
+      pricing_model=excluded.pricing_model,
+      deal_source=excluded.deal_source,
       synced_at=excluded.synced_at
   `);
 
@@ -153,9 +159,11 @@ async function runSync(runId, token, properties, sizeProperty, networkProperty, 
       const contractEndDate = contractEndProperty ? (props[contractEndProperty] || null) : null;
       const contractRenewalDate = contractRenewalProperty ? (props[contractRenewalProperty] || null) : null;
       const launchedAt = launchDateProperty ? (props[launchDateProperty] || null) : null;
+      const pricingModel = pricingModelProperty ? (props[pricingModelProperty] || null) : null;
+      const dealSource = dealSourceProperty ? (props[dealSourceProperty] || null) : null;
       const now = new Date().toISOString();
 
-      upsert.run(deal.id, name, pipeline, stageId, sizeValue, networkValue, createdAt, closeDate, launchedAt, contractStartDate, contractEndDate, contractRenewalDate, now);
+      upsert.run(deal.id, name, pipeline, stageId, sizeValue, networkValue, createdAt, closeDate, launchedAt, contractStartDate, contractEndDate, contractRenewalDate, pricingModel, dealSource, now);
     }
   });
 
@@ -169,6 +177,37 @@ async function runSync(runId, token, properties, sizeProperty, networkProperty, 
   db.prepare(
     'UPDATE sync_runs SET status=?, completed_at=?, deals_fetched=? WHERE id=?'
   ).run('completed', new Date().toISOString(), deals.length, runId);
+
+  // Fetch and save pipeline stages for stage name lookup
+  try {
+    const pipelines = await getPipelines(token);
+    const upsertStage = db.prepare(`
+      INSERT INTO pipeline_stages (id, label, pipeline_id) VALUES (?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET label=excluded.label, pipeline_id=excluded.pipeline_id
+    `);
+    const saveStages = db.transaction((pipelineList) => {
+      for (const pipeline of pipelineList) {
+        for (const stage of pipeline.stages) {
+          upsertStage.run(stage.id, stage.label, pipeline.id);
+        }
+      }
+    });
+    saveStages(pipelines);
+  } catch (err) {
+    console.warn('Failed to save pipeline stages:', err.message);
+  }
+
+  // Fetch and store HubSpot portal ID (used for deal card links)
+  try {
+    const portalId = await getPortalId(token);
+    if (portalId) {
+      db.prepare(
+        'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value'
+      ).run('hubspot_portal_id', String(portalId));
+    }
+  } catch (err) {
+    console.warn('Failed to fetch portal ID:', err.message);
+  }
 
   // Save metrics snapshot for version control
   saveSnapshot(runId, deals.length);

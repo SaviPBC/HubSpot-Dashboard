@@ -7,10 +7,14 @@
     "start": "node index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@savi/express-auth": "file:../../Google SSO/integrations/express",
     "axios": "^1.7.2",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.0",
     "node-sqlite3-wasm": "^0.8.31"
   }
 }

@@ -23,6 +23,10 @@ router.get('/', (req, res) => {
     return res.status(400).json({ error: 'from and to query parameters are required' });
   }
 
+  const stageRows = db.prepare('SELECT id, label FROM pipeline_stages').all();
+  const stageMap = Object.fromEntries(stageRows.map((s) => [s.id, s.label]));
+  const portalId = getSetting('hubspot_portal_id') || null;
+
   const { total } = db.prepare('SELECT COUNT(*) AS total FROM deals').get();
 
   // Fall back to snapshot renewal data when DB is empty
@@ -32,19 +36,19 @@ router.get('/', (req, res) => {
       const filtered = snapshot.metrics.renewal_deals.filter(
         (d) => d.contract_end_date >= from && d.contract_end_date <= to
       );
-      return res.json({ source: 'snapshot', deals: filtered });
+      return res.json({ source: 'snapshot', deals: filtered, stageMap, portalId });
     }
-    return res.json({ source: 'snapshot', deals: [] });
+    return res.json({ source: 'snapshot', deals: [], stageMap, portalId });
   }
 
   const contractEndProperty = getSetting('contract_end_property') || '';
   if (!contractEndProperty) {
-    return res.json([]);
+    return res.json({ deals: [], stageMap, portalId });
   }
 
   const deals = db
     .prepare(
-      `SELECT id, name, stage_id, pipeline, contract_start_date, contract_end_date, contract_renewal_date
+      `SELECT id, name, stage_id, pipeline, contract_start_date, contract_end_date, contract_renewal_date, pricing_model, deal_source
        FROM deals
        WHERE contract_end_date IS NOT NULL
          AND contract_end_date >= ?
@@ -53,7 +57,7 @@ router.get('/', (req, res) => {
     )
     .all(from, to);
 
-  res.json(deals);
+  res.json({ deals, stageMap, portalId });
 });
 
 module.exports = router;

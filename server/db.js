@@ -64,5 +64,9 @@ try { _db.run('ALTER TABLE deals ADD COLUMN contract_start_date TEXT'); } catch 
 try { _db.run('ALTER TABLE deals ADD COLUMN contract_end_date TEXT'); } catch (e) {}
 try { _db.run('ALTER TABLE deals ADD COLUMN contract_renewal_date TEXT'); } catch (e) {}
 try { _db.run('ALTER TABLE deals ADD COLUMN network_value TEXT'); } catch (e) {}
+try { _db.run('ALTER TABLE deals ADD COLUMN pricing_model TEXT'); } catch (e) {}
+try { _db.run('ALTER TABLE deals ADD COLUMN deal_source TEXT'); } catch (e) {}
+try { _db.run('CREATE TABLE IF NOT EXISTS pipeline_stages (id TEXT PRIMARY KEY, label TEXT NOT NULL, pipeline_id TEXT)'); } catch (e) {}
+try { _db.run('ALTER TABLE deals ADD COLUMN contact_email TEXT'); } catch (e) {}
 
 module.exports = db;

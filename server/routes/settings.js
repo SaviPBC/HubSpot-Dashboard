@@ -30,6 +30,9 @@ function maskToken(token) {
 
 router.get('/', (req, res) => {
   const token = getSetting('hubspot_api_token');
+  const anthropicKey = getSetting('anthropic_api_key');
+  const zoomSecret = getSetting('zoom_client_secret');
+  const ebToken = getSetting('eventbrite_token');
   res.json({
     has_token: !!token,
     hubspot_api_token: token ? maskToken(token) : '',
@@ -37,15 +40,24 @@ router.get('/', (req, res) => {
     network_property: getSetting('network_property') || '',
     implementing_stage_ids: getSetting('implementing_stage_ids') || '[]',
     launched_stage_ids: getSetting('launched_stage_ids') || '[]',
+    about_to_implement_stage_ids: getSetting('about_to_implement_stage_ids') || '[]',
     contract_start_property: getSetting('contract_start_property') || '',
     contract_end_property: getSetting('contract_end_property') || '',
     contract_renewal_property: getSetting('contract_renewal_property') || '',
     launch_date_property: getSetting('launch_date_property') || '',
+    pricing_model_property: getSetting('pricing_model_property') || '',
+    deal_source_property: getSetting('deal_source_property') || '',
+    zoom_account_id: getSetting('zoom_account_id') || '',
+    zoom_client_id: getSetting('zoom_client_id') || '',
+    zoom_client_secret: zoomSecret ? maskToken(zoomSecret) : '',
+    eventbrite_token: ebToken ? maskToken(ebToken) : '',
+    eventbrite_org_id: getSetting('eventbrite_org_id') || '',
+    anthropic_api_key: anthropicKey ? maskToken(anthropicKey) : '',
   });
 });
 
 router.put('/', (req, res) => {
-  const { hubspot_api_token, size_property, network_property, implementing_stage_ids, launched_stage_ids, contract_start_property, contract_end_property, contract_renewal_property, launch_date_property } = req.body;
+  const { hubspot_api_token, size_property, network_property, implementing_stage_ids, launched_stage_ids, about_to_implement_stage_ids, contract_start_property, contract_end_property, contract_renewal_property, launch_date_property, pricing_model_property, deal_source_property, zoom_account_id, zoom_client_id, zoom_client_secret, eventbrite_token, eventbrite_org_id, anthropic_api_key } = req.body;
 
   // Only save token if it's not the masked version
   if (hubspot_api_token !== undefined && !hubspot_api_token.includes(MASK)) {
@@ -57,10 +69,21 @@ router.put('/', (req, res) => {
     setSetting('implementing_stage_ids', JSON.stringify(implementing_stage_ids));
   if (launched_stage_ids !== undefined)
     setSetting('launched_stage_ids', JSON.stringify(launched_stage_ids));
+  if (about_to_implement_stage_ids !== undefined)
+    setSetting('about_to_implement_stage_ids', JSON.stringify(about_to_implement_stage_ids));
   if (contract_start_property !== undefined) setSetting('contract_start_property', contract_start_property);
   if (contract_end_property !== undefined) setSetting('contract_end_property', contract_end_property);
   if (contract_renewal_property !== undefined) setSetting('contract_renewal_property', contract_renewal_property);
   if (launch_date_property !== undefined) setSetting('launch_date_property', launch_date_property);
+  if (pricing_model_property !== undefined) setSetting('pricing_model_property', pricing_model_property);
+  if (deal_source_property !== undefined) setSetting('deal_source_property', deal_source_property);
+
+  if (zoom_account_id !== undefined) setSetting('zoom_account_id', zoom_account_id);
+  if (zoom_client_id !== undefined) setSetting('zoom_client_id', zoom_client_id);
+  if (zoom_client_secret !== undefined && !zoom_client_secret.includes(MASK)) setSetting('zoom_client_secret', zoom_client_secret);
+  if (eventbrite_token !== undefined && !eventbrite_token.includes(MASK)) setSetting('eventbrite_token', eventbrite_token);
+  if (eventbrite_org_id !== undefined) setSetting('eventbrite_org_id', eventbrite_org_id);
+  if (anthropic_api_key !== undefined && !anthropic_api_key.includes(MASK)) setSetting('anthropic_api_key', anthropic_api_key);
 
   res.json({ ok: true });
 });

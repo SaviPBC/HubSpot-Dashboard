@@ -65,8 +65,17 @@ export default function Settings() {
   const [contractEndProperty, setContractEndProperty] = useState('');
   const [contractRenewalProperty, setContractRenewalProperty] = useState('');
   const [launchDateProperty, setLaunchDateProperty] = useState('');
+  const [pricingModelProperty, setPricingModelProperty] = useState('');
+  const [dealSourceProperty, setDealSourceProperty] = useState('');
   const [implementingIds, setImplementingIds] = useState([]);
   const [launchedIds, setLaunchedIds] = useState([]);
+  const [aboutToImplementIds, setAboutToImplementIds] = useState([]);
+  const [zoomAccountId, setZoomAccountId] = useState('');
+  const [zoomClientId, setZoomClientId] = useState('');
+  const [zoomClientSecret, setZoomClientSecret] = useState('');
+  const [eventbriteToken, setEventbriteToken] = useState('');
+  const [eventbriteOrgId, setEventbriteOrgId] = useState('');
+  const [anthropicApiKey, setAnthropicApiKey] = useState('');
   const [testMsg, setTestMsg] = useState(null);
   const [saveMsg, setSaveMsg] = useState(null);
   const [properties, setProperties] = useState(null);
@@ -83,8 +92,17 @@ export default function Settings() {
       setContractEndProperty(settings.contract_end_property || '');
       setContractRenewalProperty(settings.contract_renewal_property || '');
       setLaunchDateProperty(settings.launch_date_property || '');
+      setPricingModelProperty(settings.pricing_model_property || '');
+      setDealSourceProperty(settings.deal_source_property || '');
       setImplementingIds(JSON.parse(settings.implementing_stage_ids || '[]'));
       setLaunchedIds(JSON.parse(settings.launched_stage_ids || '[]'));
+      setAboutToImplementIds(JSON.parse(settings.about_to_implement_stage_ids || '[]'));
+      setZoomAccountId(settings.zoom_account_id || '');
+      setZoomClientId(settings.zoom_client_id || '');
+      setZoomClientSecret(settings.zoom_client_secret || '');
+      setEventbriteToken(settings.eventbrite_token || '');
+      setEventbriteOrgId(settings.eventbrite_org_id || '');
+      setAnthropicApiKey(settings.anthropic_api_key || '');
     }
   }, [settings]);
 
@@ -114,6 +132,15 @@ export default function Settings() {
         launch_date_property: launchDateProperty,
         implementing_stage_ids: implementingIds,
         launched_stage_ids: launchedIds,
+        about_to_implement_stage_ids: aboutToImplementIds,
+        pricing_model_property: pricingModelProperty,
+        deal_source_property: dealSourceProperty,
+        zoom_account_id: zoomAccountId,
+        zoom_client_id: zoomClientId,
+        zoom_client_secret: zoomClientSecret,
+        eventbrite_token: eventbriteToken,
+        eventbrite_org_id: eventbriteOrgId,
+        anthropic_api_key: anthropicApiKey,
       });
       setSaveMsg({ ok: true, text: 'Settings saved!' });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
@@ -331,11 +358,61 @@ export default function Settings() {
         )}
       </div>
 
+      {/* Pricing Model & Deal Source Properties */}
+      <div style={cardStyle}>
+        <div style={sectionTitle}>Pricing Model & Deal Source Properties</div>
+        <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
+          Select the Deal properties for Pricing Model and Deal Source. These will appear as columns in all dashboard tables.
+        </p>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+          <button onClick={handleLoadProperties} disabled={loadingProps} style={btnSecondary}>
+            {loadingProps ? 'Loading...' : 'Load Properties'}
+          </button>
+        </div>
+        {properties && (
+          <>
+            <label style={labelStyle}>Pricing Model Property</label>
+            <select
+              value={pricingModelProperty}
+              onChange={(e) => setPricingModelProperty(e.target.value)}
+              style={{ ...inputStyle, height: 40 }}
+            >
+              <option value="">— Select a property —</option>
+              {properties.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.label} ({p.name})
+                </option>
+              ))}
+            </select>
+            <label style={labelStyle}>Deal Source Property</label>
+            <select
+              value={dealSourceProperty}
+              onChange={(e) => setDealSourceProperty(e.target.value)}
+              style={{ ...inputStyle, height: 40 }}
+            >
+              <option value="">— Select a property —</option>
+              {properties.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.label} ({p.name})
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+        {!properties && (pricingModelProperty || dealSourceProperty) && (
+          <p style={{ fontSize: 13, color: '#555' }}>
+            {pricingModelProperty && <>Pricing Model: <strong>{pricingModelProperty}</strong>. </>}
+            {dealSourceProperty && <>Deal Source: <strong>{dealSourceProperty}</strong>. </>}
+            Click "Load Properties" to change.
+          </p>
+        )}
+      </div>
+
       {/* Pipeline Stages */}
       <div style={cardStyle}>
         <div style={sectionTitle}>Pipeline Stages</div>
         <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
-          Mark which deal stages represent "Implementing" and "Launched".
+          Mark which deal stages represent "About to Implement" (Survey Sent / Survey Completed), "Implementing", and "Launched".
         </p>
         <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
           <button onClick={handleLoadPipelines} disabled={loadingPipes} style={btnSecondary}>
@@ -352,6 +429,7 @@ export default function Settings() {
               <thead>
                 <tr>
                   <th style={stageThStyle}>Stage</th>
+                  <th style={stageThStyle}>About to Implement</th>
                   <th style={stageThStyle}>Implementing</th>
                   <th style={stageThStyle}>Launched</th>
                 </tr>
@@ -360,6 +438,13 @@ export default function Settings() {
                 {pipeline.stages.map((stage) => (
                   <tr key={stage.id}>
                     <td style={stageTdStyle}>{stage.label}</td>
+                    <td style={{ ...stageTdStyle, textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={aboutToImplementIds.includes(stage.id)}
+                        onChange={() => toggleStage(stage.id, aboutToImplementIds, setAboutToImplementIds)}
+                      />
+                    </td>
                     <td style={{ ...stageTdStyle, textAlign: 'center' }}>
                       <input
                         type="checkbox"
@@ -381,13 +466,51 @@ export default function Settings() {
           </div>
         ))}
 
-        {!pipelines && (implementingIds.length > 0 || launchedIds.length > 0) && (
+        {!pipelines && (aboutToImplementIds.length > 0 || implementingIds.length > 0 || launchedIds.length > 0) && (
           <p style={{ fontSize: 13, color: '#555' }}>
+            About to Implement stages: {aboutToImplementIds.length} selected.{' '}
             Implementing stages: {implementingIds.length} selected.{' '}
             Launched stages: {launchedIds.length} selected.{' '}
             Click "Load Pipelines" to review or change.
           </p>
         )}
+      </div>
+
+      {/* Zoom */}
+      <div style={cardStyle}>
+        <div style={sectionTitle}>Zoom Integration</div>
+        <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
+          Create a Server-to-Server OAuth app in the Zoom Marketplace (Account credentials grant type).
+          Requires <strong>Webinar:Read</strong> scope.
+        </p>
+        <label style={labelStyle}>Account ID</label>
+        <input value={zoomAccountId} onChange={e => setZoomAccountId(e.target.value)} placeholder="abc123..." style={inputStyle} />
+        <label style={labelStyle}>Client ID</label>
+        <input value={zoomClientId} onChange={e => setZoomClientId(e.target.value)} placeholder="..." style={inputStyle} />
+        <label style={labelStyle}>Client Secret</label>
+        <input type="password" value={zoomClientSecret} onChange={e => setZoomClientSecret(e.target.value)} placeholder="..." style={inputStyle} />
+      </div>
+
+      {/* Eventbrite */}
+      <div style={cardStyle}>
+        <div style={sectionTitle}>Eventbrite Integration</div>
+        <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
+          Get your API token from the Eventbrite developer portal. Organization ID is found in your Eventbrite account URL.
+        </p>
+        <label style={labelStyle}>API Token</label>
+        <input type="password" value={eventbriteToken} onChange={e => setEventbriteToken(e.target.value)} placeholder="..." style={inputStyle} />
+        <label style={labelStyle}>Organization ID</label>
+        <input value={eventbriteOrgId} onChange={e => setEventbriteOrgId(e.target.value)} placeholder="12345678" style={inputStyle} />
+      </div>
+
+      {/* Anthropic */}
+      <div style={cardStyle}>
+        <div style={sectionTitle}>AI Analysis (Anthropic)</div>
+        <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
+          Used to generate engagement analysis on the Webinar Comparison page. Get a key from console.anthropic.com.
+        </p>
+        <label style={labelStyle}>Anthropic API Key</label>
+        <input type="password" value={anthropicApiKey} onChange={e => setAnthropicApiKey(e.target.value)} placeholder="sk-ant-..." style={inputStyle} />
       </div>
 
       {/* Save */}

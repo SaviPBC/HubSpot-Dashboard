@@ -1,0 +1,123 @@
+.container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: #f1f5f9;
+}
+
+.card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 48px 40px;
+    text-align: center;
+    max-width: 400px;
+    width: 100%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 16px;
+}
+
+.title {
+    font-size: 22px;
+    color: #1e293b;
+    margin: 0 0 24px;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+}
+
+.input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #1e293b;
+    background: #f8fafc;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.input:focus {
+    border-color: #ff7a59;
+    background: #fff;
+}
+
+.error {
+    font-size: 13px;
+    color: #dc2626;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 5px;
+    padding: 7px 10px;
+}
+
+.submitButton {
+    width: 100%;
+    background: #ff7a59;
+    color: white;
+    padding: 11px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-top: 2px;
+}
+
+.submitButton:hover:not(:disabled) {
+    background: #e8674a;
+}
+
+.submitButton:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0;
+    color: #94a3b8;
+    font-size: 13px;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e2e8f0;
+}
+
+.button {
+    display: inline-block;
+    background: white;
+    color: #1e293b;
+    border: 1px solid #cbd5e1;
+    padding: 11px 32px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: background 0.15s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.button:hover {
+    background: #f8fafc;
+}
